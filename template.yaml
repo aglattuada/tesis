@@ -1,31 +1,27 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  Pipeline para extraer datos de X/Twitter.
+  Pipeline para extraer datos de Twitter para mi tesis.
 
+# 'Resources' debe estar al mismo nivel que 'Description', sin espacios al principio.
 Resources:
-  # Nombre logico de la funcion dentro de SAM
+  # El nombre de tu función debe tener dos espacios de indentación.
   extractordatosx:
+    # 'Type' y 'Properties' deben estar al mismo nivel, con 4 espacios.
     Type: AWS::Serverless::Function
     Properties:
-      # El nombre real de la funcion en AWS Lambda
-      FunctionName: extractor-datos-x
-      # La ruta al código fuente
+      # Las propiedades deben tener 6 espacios.
       CodeUri: src/
-      # El archivo y la funcion que se ejecuta
-      Handler: funcion_lambda_extraccion_x.lambda_handler
+      Handler: lambda_function.lambda_handler
       Runtime: python3.12
-      # El ARN del rol de EJECUCION que ya tiene la Lambda
       Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/LambdaTesisExtraccionX"
-      # Eventos que disparan la funcion (scheduler de EventBridge)
+      Timeout: 60
+      MemorySize: 256
       Events:
         HourlyTrigger:
           Type: Schedule
           Properties:
-            Schedule: "cron(0 * * * ? *)" # Cada hora
-      # Configuracion de timeout y memoria
-      Timeout: 60 #segundos
-      MemorySize: 256
+            Schedule: "cron(0 * * * ? *)"
     Metadata:
-      # Indica a 'sam build' cómo instalar las dependencias
+      # 'Metadata' debe estar al mismo nivel que 'Type' y 'Properties'.
       BuildMethod: python_pip
