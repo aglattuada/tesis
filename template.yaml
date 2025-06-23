@@ -11,9 +11,9 @@ Resources:
       # El nombre real de la funcion en AWS Lambda
       FunctionName: extractor-datos-x
       # La ruta al código fuente
-      CodeUri: src/
+      CodeUri: src/funcion_lambda_extraccion_x.py
       # El archivo y la funcion que se ejecuta
-      Handler: funcion_lambda_extraccion_x.lambda_handler
+      Handler: lambda_function.lambda_handler
       Runtime: python3.12
       # El ARN del rol de EJECUCION que ya tiene la Lambda
       Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/LambdaTesisExtraccionX"

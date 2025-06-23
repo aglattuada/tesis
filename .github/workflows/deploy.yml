@@ -1,4 +1,4 @@
-name: Deploy Lambda to AWS
+name: DEBUG - Deploy Lambda to AWS
 
 on:
   push:
@@ -10,30 +10,43 @@ permissions:
   contents: read
 
 jobs:
-  deploy:
+  deploy-debug:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: 1. Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: 2. Check workspace files
+        run: |
+          echo "--- Listing files in root directory ---"
+          ls -la
+          echo "---------------------------------------"
+
+      - name: 3. Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Setup AWS SAM CLI
+      - name: 4. Setup AWS SAM CLI
         uses: aws-actions/setup-sam@v2
 
-      - name: Configure AWS credentials
+      - name: 5. Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # LA LÍNEA MÁS IMPORTANTE A VERIFICAR ES LA SIGUIENTE:
-      - name: Build with SAM
-        run: sam build --use-container --debug
+      - name: 6. Build with SAM (Explicit Template Path)
+        # Usamos --template-file para eliminar el error "No config file found"
+        run: sam build --template-file template.yaml --use-container --debug
 
-      - name: Deploy with SAM
-        run: sam deploy --no-confirm --stack-name tesis-x-pipeline --capabilities CAPABILITY_IAM --region ${{ secrets.AWS_REGION }}
+      - name: 7. Deploy with SAM
+        # También es buena práctica añadir el path de la plantilla al comando de deploy
+        run: >
+          sam deploy 
+          --template .aws-sam/build/template.yaml
+          --stack-name tesis-x-pipeline 
+          --capabilities CAPABILITY_IAM 
+          --region ${{ secrets.AWS_REGION }}
+          --no-confirm
