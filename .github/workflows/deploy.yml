@@ -44,4 +44,4 @@ jobs:
           --stack-name thesis-twitter-pipeline 
           --capabilities CAPABILITY_IAM 
           --region ${{ secrets.AWS_REGION }}
-          --no-confirm
+          --no-confirm-changeset
