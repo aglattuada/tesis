@@ -5,7 +5,7 @@ Description: >
 
 Resources:
   # Nombre logico de la funcion dentro de SAM
-  TwitterDataExtractorFunction:
+  extractordatosx:
     Type: AWS::Serverless::Function
     Properties:
       # El nombre real de la funcion en AWS Lambda
