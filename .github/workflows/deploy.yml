@@ -35,7 +35,7 @@ jobs:
         run: sam validate --region ${{ secrets.AWS_REGION }}
 
       - name: 6. Build SAM Application
-        run: sam build --use-container
+        run: sam build extractordatosx --use-container --debug
 
       - name: 7. Deploy to AWS
         run: >
