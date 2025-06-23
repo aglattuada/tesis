@@ -1,4 +1,4 @@
-name: DEBUG - Deploy Lambda to AWS
+name: Deploy Lambda to AWS
 
 on:
   push:
@@ -10,18 +10,22 @@ permissions:
   contents: read
 
 jobs:
-  deploy-debug:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: 1. Checkout code
         uses: actions/checkout@v4
+        # Este comando a veces crea un subdirectorio con el nombre del repo
+        # por eso los siguientes pasos necesitan un working-directory.
 
       - name: 2. Check workspace files
+        # Este paso nos ayudará a confirmar la estructura de carpetas
         run: |
-          echo "--- Listing files in root directory ---"
+          echo "--- Listing files in root workspace ---"
           ls -la
-          echo "---------------------------------------"
+          echo "--- Listing files in sub-directory 'tesis' ---"
+          ls -la ./tesis
 
       - name: 3. Setup Python
         uses: actions/setup-python@v5
@@ -37,16 +41,18 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: 6. Build with SAM (Explicit Template Path)
-        # Usamos --template-file para eliminar el error "No config file found"
+      - name: 6. Build with SAM
+        # Le decimos a este paso que se ejecute dentro de la carpeta 'tesis'
+        working-directory: ./tesis
         run: sam build --template-file template.yaml --use-container --debug
 
       - name: 7. Deploy with SAM
-        # También es buena práctica añadir el path de la plantilla al comando de deploy
+        # También necesita ejecutarse desde el directorio correcto
+        working-directory: ./tesis
         run: >
           sam deploy 
           --template .aws-sam/build/template.yaml
-          --stack-name tesis-x-pipeline 
+          --stack-name thesis-twitter-pipeline 
           --capabilities CAPABILITY_IAM 
           --region ${{ secrets.AWS_REGION }}
           --no-confirm
