@@ -33,6 +33,4 @@ jobs:
           echo "------------------------------------------------------------"
 
       - name: 5. Run SAM Validate
-        # Este es el paso más importante. Forzará un error claro y específico.
-        # Le añadimos --debug para máxima verbosidad.
-        run: sam validate --template template.yaml --debug
+        run: sam validate --template template.yaml --region ${{ secrets.AWS_REGION }} --debug
