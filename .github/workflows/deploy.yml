@@ -1,4 +1,4 @@
-name: Deploy Lambda to AWS
+name: Deploy to AWS Lambda
 
 on:
   push:
@@ -10,44 +10,36 @@ permissions:
   contents: read
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: 1. Checkout code
         uses: actions/checkout@v4
-        # Este comando a veces crea un subdirectorio con el nombre del repo
-        # por eso los siguientes pasos necesitan un working-directory.
 
-      - name: 2. Check workspace files
-        # Este paso nos ayudará a confirmar la estructura de carpetas
-        run: |
-          echo "--- Listing files in root workspace ---"
-          ls -la
-
-      - name: 3. Setup Python
+      - name: 2. Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: 4. Setup AWS SAM CLI
+      - name: 3. Setup AWS SAM CLI
         uses: aws-actions/setup-sam@v2
 
-      - name: 5. Configure AWS credentials
+      - name: 4. Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: 6. Build with SAM
-        # Le decimos a este paso que se ejecute dentro de la carpeta 'tesis'
-        run: sam build --template-file template.yaml --use-container --debug
+      - name: 5. Validate SAM Template
+        run: sam validate --region ${{ secrets.AWS_REGION }}
 
-      - name: 7. Deploy with SAM
-        # También necesita ejecutarse desde el directorio correcto
+      - name: 6. Build SAM Application
+        run: sam build --use-container
+
+      - name: 7. Deploy to AWS
         run: >
           sam deploy 
-          --template .aws-sam/build/template.yaml
           --stack-name thesis-twitter-pipeline 
           --capabilities CAPABILITY_IAM 
           --region ${{ secrets.AWS_REGION }}
