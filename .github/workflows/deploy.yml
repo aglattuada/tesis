@@ -41,7 +41,7 @@ jobs:
         run: >
           sam deploy 
           --template-file packaged.yaml
-          --stack-name thesis-twitter-pipeline 
+          --stack-name tesis-x-pipeline 
           --capabilities CAPABILITY_IAM 
           --region ${{ secrets.AWS_REGION }}
           --no-confirm-changeset
