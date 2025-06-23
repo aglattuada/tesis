@@ -24,8 +24,6 @@ jobs:
         run: |
           echo "--- Listing files in root workspace ---"
           ls -la
-          echo "--- Listing files in sub-directory 'tesis' ---"
-          ls -la ./tesis
 
       - name: 3. Setup Python
         uses: actions/setup-python@v5
