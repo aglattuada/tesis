@@ -4,10 +4,10 @@ import tweepy
 import boto3
 from textblob import TextBlob
 
-SECRET_NAME = "thesis/twitter/api_keys"
+SECRET_NAME = "tesis/twitter/api_keys"
 REGION_NAME = "us-east-1"
 DATA_TABLE_NAME = "TesisTwitterData"
-STATE_TABLE_NAME = "ThesisTwitterState"
+STATE_TABLE_NAME = "TesisTwitterState"
 
 # Lista de usuarios de X a monitorear
 TARGET_USERNAMES = ['Reforma', 'El_Universal_Mx', 'Milenio', 'lopezobrador_', 'RicardoAnayaC']
