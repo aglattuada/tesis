@@ -4,20 +4,17 @@ Description: >
   Pipeline para extraer datos de Twitter para mi tesis.
 
 Resources:
-  extractordatosx:
+  extractordatosx: # Nombre lógico dentro de SAM
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: extractor-datos-x
       CodeUri: src/
       Handler: lambda_function.lambda_handler
       Runtime: python3.12
-      Role: !Sub "arn:aws:secretsmanager:us-east-2:434411352990:role/LambdaTesisExtraccionX"
-      Events:
-        HourlyTrigger:
-          Type: Schedule
-          Properties:
-            Schedule: "cron(0 * * * ? *)"
-      Timeout: 60
-      MemorySize: 256
+      Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/LambdaTesisExtraccionX"
+      Timeout: 900 # 15 minutos, el máximo para Lambda
+      MemorySize: 512
     Metadata:
+      # BuildMethod ya no es necesario porque no usamos 'sam build'
+      # ¡PERO LO NECESITA 'sam package' PARA SABER CÓMO CONSTRUIR!
       BuildMethod: python_pip

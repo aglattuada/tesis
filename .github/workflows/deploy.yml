@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  build-and-deploy:
+  package-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -24,8 +24,6 @@ jobs:
 
       - name: 3. Setup AWS SAM CLI
         uses: aws-actions/setup-sam@v2
-        with:
-          version: 1.115.0
 
       - name: 4. Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -33,15 +31,16 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: 5. Validate SAM Template
-        run: sam validate --region ${{ secrets.AWS_REGION }}
+      - name: 5. Run SAM Package
+        run: >
+          sam package 
+          --s3-bucket ${{ secrets.AWS_S3_BUCKET_FOR_DEPLOY }} 
+          --output-template-file packaged.yaml
 
-      - name: 6. Build SAM Application
-        run: sam build extractordatosx --use-container --debug
-
-      - name: 7. Deploy to AWS
+      - name: 6. Run SAM Deploy
         run: >
           sam deploy 
+          --template-file packaged.yaml
           --stack-name thesis-twitter-pipeline 
           --capabilities CAPABILITY_IAM 
           --region ${{ secrets.AWS_REGION }}
