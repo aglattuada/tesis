@@ -14,6 +14,11 @@ Resources:
       Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/LambdaTesisExtraccionX"
       Timeout: 900 # 15 minutos, el máximo para Lambda
       MemorySize: 512
+      Events:
+        HourlyTrigger:
+          Type: Schedule
+          Properties:
+            Schedule: "cron(0 * * * ? *)"
     Metadata:
       # BuildMethod ya no es necesario porque no usamos 'sam build'
       # ¡PERO LO NECESITA 'sam package' PARA SABER CÓMO CONSTRUIR!
