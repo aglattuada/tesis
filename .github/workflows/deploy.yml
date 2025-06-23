@@ -33,7 +33,7 @@ jobs:
 
       # LA LÍNEA MÁS IMPORTANTE A VERIFICAR ES LA SIGUIENTE:
       - name: Build with SAM
-        run: sam build --use-container
+        run: sam build --use-container --debug
 
       - name: Deploy with SAM
         run: sam deploy --no-confirm --stack-name tesis-x-pipeline --capabilities CAPABILITY_IAM --region ${{ secrets.AWS_REGION }}
