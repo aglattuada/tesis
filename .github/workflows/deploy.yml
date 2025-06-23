@@ -24,6 +24,8 @@ jobs:
 
       - name: 3. Setup AWS SAM CLI
         uses: aws-actions/setup-sam@v2
+        with:
+          version: 1.115.0
 
       - name: 4. Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
