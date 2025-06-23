@@ -3,25 +3,21 @@ Transform: AWS::Serverless-2016-10-31
 Description: >
   Pipeline para extraer datos de Twitter para mi tesis.
 
-# 'Resources' debe estar al mismo nivel que 'Description', sin espacios al principio.
 Resources:
-  # El nombre de tu función debe tener dos espacios de indentación.
   extractordatosx:
-    # 'Type' y 'Properties' deben estar al mismo nivel, con 4 espacios.
     Type: AWS::Serverless::Function
     Properties:
-      # Las propiedades deben tener 6 espacios.
+      FunctionName: extractor-datos-x
       CodeUri: src/
       Handler: lambda_function.lambda_handler
       Runtime: python3.12
       Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/LambdaTesisExtraccionX"
-      Timeout: 60
-      MemorySize: 256
       Events:
         HourlyTrigger:
           Type: Schedule
           Properties:
             Schedule: "cron(0 * * * ? *)"
+      Timeout: 60
+      MemorySize: 256
     Metadata:
-      # 'Metadata' debe estar al mismo nivel que 'Type' y 'Properties'.
       BuildMethod: python_pip
