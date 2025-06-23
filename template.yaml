@@ -1,0 +1,31 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Pipeline para extraer datos de X/Twitter.
+
+Resources:
+  # Nombre logico de la funcion dentro de SAM
+  TwitterDataExtractorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      # El nombre real de la funcion en AWS Lambda
+      FunctionName: twitter-data-extractor
+      # La ruta al código fuente
+      CodeUri: src/
+      # El archivo y la funcion que se ejecuta
+      Handler: funcion_lambda_extraccion_x.lambda_handler
+      Runtime: python3.12
+      # El ARN del rol de EJECUCION que ya tiene la Lambda
+      Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/LambdaTwitterExtractorRole"
+      # Eventos que disparan la funcion (scheduler de EventBridge)
+      Events:
+        HourlyTrigger:
+          Type: Schedule
+          Properties:
+            Schedule: "cron(0 * * * ? *)" # Cada hora
+      # Configuracion de timeout y memoria
+      Timeout: 60 #segundos
+      MemorySize: 256
+    Metadata:
+      # Indica a 'sam build' cómo instalar las dependencias
+      BuildMethod: python_pip

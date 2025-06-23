@@ -1,0 +1,50 @@
+# Nombre del workflow que aparecerá en la pestaña "Actions" de GitHub
+name: Deploy Lambda to AWS
+
+# Trigger: Este workflow se ejecuta en cada push a la rama 'master'
+on:
+  push:
+    branches:
+      - master
+
+# Permisos necesarios para que el workflow pueda autenticarse con AWS vía OIDC
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    # El tipo de máquina virtual con la que se ejecutará el workflow
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Clona de repositorio en la máquina virtual
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Configurar el entorno de Python
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # 3. Configurar CLI de AWS SAM
+      - name: Setup AWS SAM CLI
+        uses: aws-actions/setup-sam@v2
+
+      # 4. Configurar las credenciales de AWS con OIDC (metodo seguro)
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # 5. Construir el proyecto con SAM (instalacion de dependencias)
+      # El comando 'build' usa el archivo template.yaml
+      - name: Build with SAM
+        run: sam build --use-container
+
+      # 6. Desplegar el proyecto a AWS con SAM
+      # SAM se encarga de empaquetar, subir a S3 y actualizar la función Lambda
+      - name: Deploy with SAM
+        run: sam deploy --no-confirm --stack-name thesis-twitter-pipeline --capabilities CAPABILITY_IAM --region ${{ secrets.AWS_REGION }}
