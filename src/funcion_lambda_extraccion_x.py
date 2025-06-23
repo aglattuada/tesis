@@ -4,35 +4,51 @@ import tweepy
 import boto3
 from textblob import TextBlob
 
+# --- CONFIGURACION AWS ---
 SECRET_NAME = "tesis/twitter/api_keys"
-REGION_NAME = "us-east-1"
+REGION_NAME = "us-east-2"
 DATA_TABLE_NAME = "TesisTwitterData"
 STATE_TABLE_NAME = "TesisTwitterState"
 
-# Lista de usuarios de X a monitorear
-TARGET_USERNAMES = [
+# Listas de Medios y Candidatos
+MEDIOS = [
     "Reforma",
     "El_Universal_Mx",
     "Milenio",
-    "Excelsior",
     "AristeguiOnline",
+    "SinEmbargoMX",
+    "Excélsior",
     "ElFinanciero_Mx",
-    "ProcesoMX",
-    "ElEconomistaMX",
+    "Proceso",
+    "El_Informador",
+    "La_Opcion_MX",
     "AnimalPolitico",
+    "ElEconomistaMX",
+    "El_Pais_Mexico",
+    "El_Informador_MX",
+    "La_Jornada",
+    "El_Sol_de_Mexico",
 ]
+CANDIDATOS = {
+    "AMLO": ["@lopezobrador_", '"Andrés Manuel"', '"López Obrador"', "AMLO"],
+    "Anaya": ["@RicardoAnayaC", '"Ricardo Anaya"'],
+    "Meade": ["@JoseAMeadeK", '"José Antonio Meade"'],
+}
 
-# --- Inicialización de clientes de AWS  ---
+# Rango de fechas de la búsqueda histórica
+START_TIME = "2018-03-30T00:00:00Z"
+END_TIME = "2018-06-27T23:59:59Z"
+
+# --- Inicialización de clientes de AWS ---
 session = boto3.session.Session()
 secrets_client = session.client(service_name="secretsmanager", region_name=REGION_NAME)
 dynamodb = boto3.resource("dynamodb")
-# Tablas de dynamodb para los datos y para el estado
 data_table = dynamodb.Table(DATA_TABLE_NAME)
 state_table = dynamodb.Table(STATE_TABLE_NAME)
 
 
 def get_secret():
-    """Obtiene el secreto API X desde AWS Secrets Manager"""
+    """Obtiene el secreto desde AWS Secrets Manager."""
     try:
         get_secret_value_response = secrets_client.get_secret_value(
             SecretId=SECRET_NAME
@@ -45,77 +61,94 @@ def get_secret():
 
 
 BEARER_TOKEN = get_secret()
-api_client = tweepy.Client(BEARER_TOKEN)
+api_client = tweepy.Client(BEARER_TOKEN, wait_on_rate_limit=True)
 
 
 def lambda_handler(event, context):
     """
-    Punto de entrada de la función Lambda. Incluye lógica de estado para evitar duplicados.
+    Función Lambda que realiza una búsqueda histórica REANUDABLE.
     """
-    print("Función con estado iniciada.")
+    print(f"Iniciando búsqueda de tuits entre {START_TIME} y {END_TIME}")
 
-    for username in TARGET_USERNAMES:
-        print(f"--- Procesando usuario: {username} ---")
-        last_seen_id = None
+    for medio in MEDIOS:
+        for candidato_nombre, terminos_busqueda in CANDIDATOS.items():
 
-        # 1. LEER ESTADO: Obtener el último tweet_id visto para este usuario
-        try:
-            response = state_table.get_item(Key={"username": username})
-            if "Item" in response:
-                last_seen_id = response["Item"]["last_seen_tweet_id"]
-                print(f"Último ID visto para {username}: {last_seen_id}")
-        except Exception as e:
-            print(
-                f"No se pudo leer el estado para {username} (quizás es la primera vez). Error: {e}"
-            )
+            # 1. CREAR ID ÚNICO PARA LA BÚSQUEDA Y CONSTRUIR LA CONSULTA
+            search_id = f"{medio}_{candidato_nombre}"
+            query_terminos = f"({' OR '.join(terminos_busqueda)})"
+            query = f"from:{medio} {query_terminos} -is:retweet"
 
-        # 2. CONSULTAR CON CONTEXTO: Usar since_id si lo tenemos
-        try:
-            # max_results puede ser más alto, hasta 100 por llamada por restriccion de cuenta developer X
-            response = api_client.get_users_tweets(
-                id=api_client.get_user(username=username).data.id,
-                max_results=100,
-                tweet_fields=["created_at", "public_metrics"],
-                since_id=last_seen_id,
-            )
+            print(f"--- Procesando búsqueda ID: {search_id} ---")
+            print(f"Consulta: {query}")
 
-            if not response.data:
-                print(f"No hay tuits nuevos para {username} desde el último chequeo.")
+            last_seen_id = None
+            # 2. LEER ESTADO ANTERIOR PARA ESTA BÚSQUEDA ESPECÍFICA
+            try:
+                response = state_table.get_item(Key={"search_query_id": search_id})
+                if "Item" in response:
+                    last_seen_id = response["Item"]["last_seen_tweet_id"]
+                    print(f"Búsqueda reanudada. Último ID visto: {last_seen_id}")
+            except Exception as e:
+                print(f"No se pudo leer el estado para {search_id}. Error: {e}")
+
+            try:
+                # 3. EJECUTAR BÚSQUEDA CON PAGINADOR Y since_id
+                paginator = tweepy.Paginator(
+                    api_client.search_all_tweets,
+                    query=query,
+                    start_time=START_TIME,
+                    end_time=END_TIME,
+                    since_id=last_seen_id,
+                    tweet_fields=["created_at", "public_metrics"],
+                    max_results=100,
+                ).flatten(
+                    limit=500
+                )  # Límite de seguridad por ejecución de Lambda
+
+                # Lista para guardar los tuits del lote antes de actualizar el estado
+                nuevos_tweets_del_lote = list(paginator)
+
+                if nuevos_tweets_del_lote:
+                    print(f"Se encontraron {len(nuevos_tweets_del_lote)} tuits nuevos.")
+
+                    # 4. GUARDAR LOS NUEVOS TUITS EN LA TABLA
+                    for tweet in nuevos_tweets_del_lote:
+                        sentiment = TextBlob(tweet.text).sentiment.polarity
+                        tweet_data = {
+                            "tweet_id": str(tweet.id),
+                            "created_at": tweet.created_at.isoformat(),
+                            "autor_medio": medio,
+                            "candidato_mencionado": candidato_nombre,
+                            "texto": tweet.text,
+                            "retweet_count": tweet.public_metrics["retweet_count"],
+                            "like_count": tweet.public_metrics["like_count"],
+                            "sentiment_score": str(sentiment),
+                        }
+                        data_table.put_item(Item=tweet_data)
+
+                    # 5. ACTUALIZAR ESTADO con el ID del tuit más reciente del LOTE ACTUAL
+                    new_last_seen_id = nuevos_tweets_del_lote[0].id
+                    print(
+                        f"Actualizando estado para '{search_id}' al nuevo ID: {new_last_seen_id}"
+                    )
+                    state_table.put_item(
+                        Item={
+                            "search_query_id": search_id,
+                            "last_seen_tweet_id": str(new_last_seen_id),
+                        }
+                    )
+                else:
+                    print(
+                        "No se encontraron tuits nuevos para esta consulta en esta ejecución."
+                    )
+
+            except Exception as e:
+                print(
+                    f"Error fatal durante la paginación o guardado para {search_id}: {e}"
+                )
                 continue
-
-            new_tweets = response.data
-            print(f"Se encontraron {len(new_tweets)} tuits nuevos para {username}.")
-
-            # El tuit más reciente en la respuesta de la API siempre es el primero
-            new_last_seen_id = new_tweets[0].id
-
-            # 3. GUARDAR DATOS: Guardar los nuevos tweets en la tabla de dynamnodb
-            for tweet in new_tweets:
-                sentiment = TextBlob(tweet.text).sentiment.polarity
-                tweet_data = {
-                    "tweet_id": str(tweet.id),
-                    "created_at": tweet.created_at.isoformat(),
-                    "username": username,
-                    "text": tweet.text,
-                    "retweet_count": tweet.public_metrics["retweet_count"],
-                    "like_count": tweet.public_metrics["like_count"],
-                    "sentiment_score": str(sentiment),
-                }
-                data_table.put_item(Item=tweet_data)
-
-            # 4. ACTUALIZAR ESTADO: Guardar el ID del tuit más reciente para la próxima ejecucion
-            print(
-                f"Actualizando el último ID visto para {username} a: {new_last_seen_id}"
-            )
-            state_table.put_item(
-                Item={"username": username, "last_seen_tweet_id": str(new_last_seen_id)}
-            )
-
-        except Exception as e:
-            print(f"Error procesando la API de X para {username}: {e}")
-            continue
 
     return {
         "statusCode": 200,
-        "body": json.dumps("Proceso con estado completado exitosamente!"),
+        "body": json.dumps("Proceso de búsqueda con estado completado."),
     }
