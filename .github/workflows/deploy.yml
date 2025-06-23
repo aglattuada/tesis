@@ -41,12 +41,10 @@ jobs:
 
       - name: 6. Build with SAM
         # Le decimos a este paso que se ejecute dentro de la carpeta 'tesis'
-        working-directory: ./tesis
         run: sam build --template-file template.yaml --use-container --debug
 
       - name: 7. Deploy with SAM
         # También necesita ejecutarse desde el directorio correcto
-        working-directory: ./tesis
         run: >
           sam deploy 
           --template .aws-sam/build/template.yaml
