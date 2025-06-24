@@ -1,25 +1,44 @@
+#AWSTemplateFormatVersion: '2010-09-09'
+#Transform: AWS::Serverless-2016-10-31
+#Description: >
+#  Pipeline para extraer datos de Twitter para mi tesis.
+#
+#Resources:
+#  extractordatosx: # Nombre lógico dentro de SAM
+#    Type: AWS::Serverless::Function
+#    Properties:
+#      FunctionName: extractor-datos-x
+#      CodeUri: src/
+#      Handler: funcion_lambda_extraccion_x.lambda_handler
+#      Runtime: python3.12
+#      Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/LambdaTesisExtraccionX"
+#      Timeout: 900 # 15 minutos, el máximo para Lambda
+#      MemorySize: 512
+#      Events:
+#        HourlyTrigger:
+#          Type: Schedule
+#          Properties:
+#            Schedule: "cron(0 * * * ? *)"
+#    Metadata:
+#      BuildMethod: python_pip
+# template.yaml para FASE 1
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: >
-  Pipeline para extraer datos de Twitter para mi tesis.
+Description: Stack para crear la infraestructura base de la tesis.
 
 Resources:
-  extractordatosx: # Nombre lógico dentro de SAM
+  extractordatosx:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: extractor-datos-x
-      CodeUri: src/
-      Handler: funcion_lambda_extraccion_x.lambda_handler
+      Handler: index.handler # Un handler placeholder
       Runtime: python3.12
       Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/LambdaTesisExtraccionX"
-      Timeout: 900 # 15 minutos, el máximo para Lambda
-      MemorySize: 512
+      Timeout: 60
+      MemorySize: 128
       Events:
         HourlyTrigger:
           Type: Schedule
           Properties:
             Schedule: "cron(0 * * * ? *)"
-    Metadata:
-      # BuildMethod ya no es necesario porque no usamos 'sam build'
-      # ¡PERO LO NECESITA 'sam package' PARA SABER CÓMO CONSTRUIR!
-      BuildMethod: python_pip
+            Enabled: false # La creamos deshabilitada a propósito

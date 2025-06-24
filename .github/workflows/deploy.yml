@@ -1,4 +1,49 @@
-name: Deploy to AWS Lambda
+#name: Deploy to AWS Lambda
+#
+#on:
+#  push:
+#    branches:
+#      - master
+#
+#permissions:
+#  id-token: write
+#  contents: read
+#
+#jobs:
+#  package-and-deploy:
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#      - name: 1. Checkout code
+#        uses: actions/checkout@v4
+#
+#      - name: 2. Setup Python
+#        uses: actions/setup-python@v5
+#        with:
+#          python-version: '3.12'
+#
+#      - name: 3. Setup AWS SAM CLI
+#        uses: aws-actions/setup-sam@v2
+#
+#      - name: 4. Configure AWS credentials
+#        uses: aws-actions/configure-aws-credentials@v4
+#        with:
+#          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+#          aws-region: ${{ secrets.AWS_REGION }}
+#
+#      - name: 5. Run SAM Build
+#        run: sam build --use-container --debug
+#
+#      - name: 6. Run SAM Deploy
+#        run: >
+#          sam deploy
+#          --s3-bucket ${{ secrets.AWS_S3_BUCKET_FOR_DEPLOY }}
+#          --stack-name tesis-x-pipeline
+#          --capabilities CAPABILITY_IAM
+#          --region ${{ secrets.AWS_REGION }}
+#          --no-confirm-changeset
+# deploy.yml para FASE 1
+name: DEPLOY INFRASTRUCTURE
 
 on:
   push:
@@ -10,35 +55,22 @@ permissions:
   contents: read
 
 jobs:
-  package-and-deploy:
+  deploy-infra:
     runs-on: ubuntu-latest
-
     steps:
-      - name: 1. Checkout code
+      - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: 2. Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: 3. Setup AWS SAM CLI
+      - name: Setup SAM CLI
         uses: aws-actions/setup-sam@v2
-
-      - name: 4. Configure AWS credentials
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: 5. Run SAM Build
-        run: sam build --use-container --debug
-
-      - name: 6. Run SAM Deploy
+      - name: Deploy Infrastructure Stack
         run: >
           sam deploy
-          --s3-bucket ${{ secrets.AWS_S3_BUCKET_FOR_DEPLOY }}
-          --stack-name tesis-x-pipeline 
-          --capabilities CAPABILITY_IAM 
+          --stack-name tesis-extraccion-x-pipeline
+          --capabilities CAPABILITY_IAM
           --region ${{ secrets.AWS_REGION }}
-          --no-confirm-changeset
+          --no-confirm
