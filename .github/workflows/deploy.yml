@@ -42,8 +42,7 @@
 #          --capabilities CAPABILITY_IAM
 #          --region ${{ secrets.AWS_REGION }}
 #          --no-confirm-changeset
-# deploy.yml para FASE 1
-name: DEPLOY INFRASTRUCTURE
+name: Deploy to AWS Lambda
 
 on:
   push:
@@ -55,22 +54,37 @@ permissions:
   contents: read
 
 jobs:
-  deploy-infra:
+  build-and-deploy-code:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
+      - name: 1. Checkout code
         uses: actions/checkout@v4
-      - name: Setup SAM CLI
-        uses: aws-actions/setup-sam@v2
-      - name: Configure AWS credentials
+
+      - name: 2. Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 3. Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.AWS_REGION }}
-      - name: Deploy Infrastructure Stack
+
+      - name: 4. Build deployment package manually
+        run: |
+          echo "Creando el paquete de despliegue..."
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -t ./package
+          echo "Dependencias instaladas. Copiando código fuente..."
+          cp -r src/* ./package/
+          echo "Empaquetando en .zip..."
+          cd package
+          zip -r ../deployment_package.zip .
+
+      - name: 5. Deploy code to existing Lambda function
         run: >
-          sam deploy
-          --stack-name tesis-extraccion-x-pipeline
-          --capabilities CAPABILITY_IAM
-          --region ${{ secrets.AWS_REGION }}
-          --no-confirm-changeset
+          aws lambda update-function-code
+          --function-name twitter-data-extractor
+          --zip-file fileb://deployment_package.zip

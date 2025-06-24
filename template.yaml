@@ -1,60 +1,23 @@
-#AWSTemplateFormatVersion: '2010-09-09'
-#Transform: AWS::Serverless-2016-10-31
-#Description: >
-#  Pipeline para extraer datos de Twitter para mi tesis.
-#
-#Resources:
-#  extractordatosx: # Nombre lógico dentro de SAM
-#    Type: AWS::Serverless::Function
-#    Properties:
-#      FunctionName: extractor-datos-x
-#      CodeUri: src/
-#      Handler: funcion_lambda_extraccion_x.lambda_handler
-#      Runtime: python3.12
-#      Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/LambdaTesisExtraccionX"
-#      Timeout: 900 # 15 minutos, el máximo para Lambda
-#      MemorySize: 512
-#      Events:
-#        HourlyTrigger:
-#          Type: Schedule
-#          Properties:
-#            Schedule: "cron(0 * * * ? *)"
-#    Metadata:
-#      BuildMethod: python_pip
-# template.yaml para FASE 1
-# template.yaml para la PRUEBA DEFINITIVA (FASE 1)
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Stack para crear la infraestructura base de la tesis (Prueba Inline).
+Description: >
+  Pipeline para extraer datos de Twitter para mi tesis.
 
 Resources:
-  extractordatosx:
+  extractordatosx: # Nombre lógico dentro de SAM
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: extractor-datos-x
+      CodeUri: src/
+      Handler: funcion_lambda_extraccion_x.lambda_handler
       Runtime: python3.12
       Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/LambdaTesisExtraccionX"
-      Timeout: 30
-      MemorySize: 128
-      # --- EL CAMBIO CLAVE ESTÁ AQUÍ ---
-      # Usamos InlineCode para poner el código directamente en la plantilla.
-      InlineCode: |
-        import json
-
-        def lambda_handler(event, context):
-            print("Función base desplegada correctamente!")
-            return {
-                "statusCode": 200,
-                "body": json.dumps({
-                    "message": "Infraestructura creada!",
-                }),
-            }
-      # El handler ahora apunta a 'index.lambda_handler' porque no hay
-      # un nombre de archivo, 'index' es el nombre por defecto para código inline.
-      Handler: index.lambda_handler
+      Timeout: 900 # 15 minutos, el máximo para Lambda
+      MemorySize: 512
       Events:
         HourlyTrigger:
           Type: Schedule
           Properties:
             Schedule: "cron(0 * * * ? *)"
-            Enabled: false # La creamos deshabilitada a propósito
+    Metadata:
+      BuildMethod: python_pip
