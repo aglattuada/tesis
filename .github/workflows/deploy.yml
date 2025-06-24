@@ -86,5 +86,5 @@ jobs:
       - name: 5. Deploy code to existing Lambda function
         run: >
           aws lambda update-function-code
-          --function-name twitter-data-extractor
+          --function-name extractor-datos-x
           --zip-file fileb://deployment_package.zip
