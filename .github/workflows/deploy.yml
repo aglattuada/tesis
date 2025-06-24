@@ -10,7 +10,7 @@
 #  contents: read
 #
 #jobs:
-#  package-and-deploy:
+#  build-and-deploy-code:
 #    runs-on: ubuntu-latest
 #
 #    steps:
@@ -22,26 +22,41 @@
 #        with:
 #          python-version: '3.12'
 #
-#      - name: 3. Setup AWS SAM CLI
-#        uses: aws-actions/setup-sam@v2
-#
-#      - name: 4. Configure AWS credentials
+#      - name: 3. Configure AWS credentials
 #        uses: aws-actions/configure-aws-credentials@v4
 #        with:
 #          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
 #          aws-region: ${{ secrets.AWS_REGION }}
 #
-#      - name: 5. Run SAM Build
-#        run: sam build --use-container --debug
+#      - name: 4. Build deployment package manually
+#        run: |
+#          echo "Creando el paquete de despliegue..."
+#          python -m pip install --upgrade pip
+#          pip install -r requirements.txt -t ./package
+#          echo "Dependencias instaladas. Copiando código fuente..."
+#          cp -r src/* ./package/
+#          echo "Empaquetando en .zip..."
+#          cd package
+#          zip -r ../deployment_package.zip .
 #
-#      - name: 6. Run SAM Deploy
+#      - name: 5. Deploy code to existing Lambda function
 #        run: >
-#          sam deploy
-#          --s3-bucket ${{ secrets.AWS_S3_BUCKET_FOR_DEPLOY }}
-#          --stack-name tesis-x-pipeline
-#          --capabilities CAPABILITY_IAM
-#          --region ${{ secrets.AWS_REGION }}
-#          --no-confirm-changeset
+#          aws lambda update-function-code
+#          --function-name extractor-datos-x
+#          --zip-file fileb://deployment_package.zip
+#
+#      - name: Wait for function update to complete
+#        run: sleep 15
+#
+#      - name: 6. Update Lambda function configuration
+#        run: >
+#          aws lambda update-function-configuration
+#          --function-name extractor-datos-x
+#          --handler funcion_lambda_extraccion_x.lambda_handler
+#          --runtime python3.12
+#          --timeout 900
+#          --memory-size 512
+
 name: Deploy to AWS Lambda
 
 on:
@@ -54,7 +69,7 @@ permissions:
   contents: read
 
 jobs:
-  build-and-deploy-code:
+  package-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -66,37 +81,26 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: 3. Configure AWS credentials
+      - name: 3. Setup AWS SAM CLI
+        uses: aws-actions/setup-sam@v2
+
+      - name: 4. Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: 4. Build deployment package manually
-        run: |
-          echo "Creando el paquete de despliegue..."
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt -t ./package
-          echo "Dependencias instaladas. Copiando código fuente..."
-          cp -r src/* ./package/
-          echo "Empaquetando en .zip..."
-          cd package
-          zip -r ../deployment_package.zip .
-
-      - name: 5. Deploy code to existing Lambda function
+      - name: 5. Run SAM Package
         run: >
-          aws lambda update-function-code
-          --function-name extractor-datos-x
-          --zip-file fileb://deployment_package.zip
+          sam package 
+          --s3-bucket ${{ secrets.AWS_S3_BUCKET_FOR_DEPLOY }} 
+          --output-template-file packaged.yaml
 
-      - name: Wait for function update to complete
-        run: sleep 15
-
-      - name: 6. Update Lambda function configuration
+      - name: 6. Run SAM Deploy
         run: >
-          aws lambda update-function-configuration
-          --function-name extractor-datos-x
-          --handler funcion_lambda_extraccion_x.lambda_handler
-          --runtime python3.12
-          --timeout 900
-          --memory-size 512
+          sam deploy 
+          --template-file packaged.yaml
+          --stack-name tesis-extraccion-x-pipeline 
+          --capabilities CAPABILITY_IAM 
+          --region ${{ secrets.AWS_REGION }}
+          --no-confirm-changeset

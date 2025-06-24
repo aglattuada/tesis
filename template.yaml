@@ -1,23 +1,62 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  Pipeline para extraer datos de Twitter para mi tesis.
+  Pipeline para la recolección continua de datos de X para la tesis.
+
+Parameters:
+  ExecutionRoleArn:
+    Type: String
+    Default: !Sub "arn:aws:iam::${AWS::AccountId}:role/LambdaTesisExtraccionX"
 
 Resources:
-  extractordatosx: # Nombre lógico dentro de SAM
+  # La tabla para guardar los tuits extraídos (sin cambios)
+  DataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: TesisTwitterData
+      AttributeDefinitions:
+        - AttributeName: tweet_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: tweet_id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  # NUEVA TABLA para guardar el estado de la búsqueda
+  StateTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: TesisTwitterState
+      AttributeDefinitions:
+        - AttributeName: search_query_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: search_query_id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  # Nuestra función Lambda, ahora con permisos definidos aquí mismo
+  extractordatosx:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: extractor-datos-x
       CodeUri: src/
       Handler: funcion_lambda_extraccion_x.lambda_handler
       Runtime: python3.12
-      Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/LambdaTesisExtraccionX"
-      Timeout: 900 # 15 minutos, el máximo para Lambda
+      Role: !Ref ExecutionRoleArn
+      Timeout: 900
       MemorySize: 512
       Events:
         HourlyTrigger:
           Type: Schedule
           Properties:
             Schedule: "cron(0 * * * ? *)"
+            Enabled: true # La habilitamos para que corra
+      # NUEVA SECCIÓN de políticas para dar permisos a la Lambda
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DataTable # Permiso para la tabla de datos
+        - DynamoDBCrudPolicy:
+            TableName: !Ref StateTable # Permiso para la tabla de estado
     Metadata:
       BuildMethod: python_pip
