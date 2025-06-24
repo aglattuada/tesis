@@ -89,6 +89,9 @@ jobs:
           --function-name extractor-datos-x
           --zip-file fileb://deployment_package.zip
 
+      - name: Wait for function update to complete
+        run: sleep 15
+
       - name: 6. Update Lambda function configuration
         run: >
           aws lambda update-function-configuration
