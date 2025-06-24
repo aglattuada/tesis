@@ -88,3 +88,12 @@ jobs:
           aws lambda update-function-code
           --function-name extractor-datos-x
           --zip-file fileb://deployment_package.zip
+
+      - name: 6. Update Lambda function configuration
+        run: >
+          aws lambda update-function-configuration
+          --function-name extractor-datos-x
+          --handler funcion_lambda_extraccion_x.lambda_handler
+          --runtime python3.12
+          --timeout 900
+          --memory-size 512
