@@ -3,13 +3,7 @@ Transform: AWS::Serverless-2016-10-31
 Description: >
   Pipeline para la recolección continua de datos de X para la tesis.
 
-Parameters:
-  ExecutionRoleArn:
-    Type: String
-    Default: !Sub "arn:aws:iam::${AWS::AccountId}:role/LambdaTesisExtraccionX"
-
 Resources:
-  # La tabla para guardar los tuits extraídos (sin cambios)
   DataTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -22,7 +16,6 @@ Resources:
           KeyType: HASH
       BillingMode: PAY_PER_REQUEST
 
-  # NUEVA TABLA para guardar el estado de la búsqueda
   StateTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -35,7 +28,6 @@ Resources:
           KeyType: HASH
       BillingMode: PAY_PER_REQUEST
 
-  # Nuestra función Lambda, ahora con permisos definidos aquí mismo
   extractordatosx:
     Type: AWS::Serverless::Function
     Properties:
@@ -43,7 +35,7 @@ Resources:
       CodeUri: src/
       Handler: funcion_lambda_extraccion_x.lambda_handler
       Runtime: python3.12
-      Role: !Ref ExecutionRoleArn
+      Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/LambdaTesisExtraccionX"
       Timeout: 900
       MemorySize: 512
       Events:
@@ -51,12 +43,11 @@ Resources:
           Type: Schedule
           Properties:
             Schedule: "cron(0 * * * ? *)"
-            Enabled: true # La habilitamos para que corra
-      # NUEVA SECCIÓN de políticas para dar permisos a la Lambda
+            Enabled: true
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref DataTable # Permiso para la tabla de datos
+            TableName: !Ref DataTable
         - DynamoDBCrudPolicy:
-            TableName: !Ref StateTable # Permiso para la tabla de estado
+            TableName: !Ref StateTable
     Metadata:
       BuildMethod: python_pip
