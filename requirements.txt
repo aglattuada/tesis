@@ -1,3 +1,4 @@
 tweepy
 boto3
 textblob
+vader-multi
