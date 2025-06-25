@@ -10,9 +10,9 @@ permissions:
   contents: read
 
 jobs:
-  package-and-deploy:
+  manual-build-and-deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: 1. Checkout code
         uses: actions/checkout@v4
@@ -21,29 +21,43 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          
-      - name: 3. Setup AWS SAM CLI
-        uses: aws-actions/setup-sam@v2
 
-      - name: 4. Configure AWS credentials
+      - name: 3. Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: 5. Run SAM Package
-        # Este paso empaqueta tu código y dependencias y lo sube a S3
-        run: >
-          sam package 
-          --s3-bucket ${{ secrets.AWS_S3_BUCKET_FOR_DEPLOY }} 
-          --output-template-file packaged.yaml
+      - name: 4. Build deployment package manually
+        # Este paso nos da control total sobre el empaquetado
+        run: |
+          set -e # El script fallará si cualquier comando falla
+          echo "--- Instalando dependencias de requirements.txt ---"
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -t ./package
+          echo "--- Dependencias instaladas. Copiando código fuente... ---"
+          cp -r src/* ./package/
+          echo "--- Código fuente copiado. Contenido del paquete: ---"
+          ls -la ./package
+          echo "--------------------------------------------------------"
+          echo "--- Comprimiendo el paquete de despliegue ---"
+          cd package
+          zip -r ../deployment_package.zip .
 
-      - name: 6. Run SAM Deploy
-        # Este paso lee la plantilla empaquetada y crea/actualiza la infraestructura
+      - name: 5. Deploy Code to Lambda
         run: >
-          sam deploy 
-          --template-file packaged.yaml
-          --stack-name tesis-extraccion-x-pipeline 
-          --capabilities CAPABILITY_IAM 
-          --region ${{ secrets.AWS_REGION }}
-          --no-confirm-changeset
+          aws lambda update-function-code
+          --function-name extractor-datos-x
+          --zip-file fileb://deployment_package.zip
+
+      - name: 6. Wait for code update to finish
+        run: sleep 15
+
+      - name: 7. Update Function Configuration
+        run: >
+          aws lambda update-function-configuration
+          --function-name extractor-datos-x
+          --handler funcion_lambda_extraccion_x.lambda_handler
+          --runtime python3.12
+          --timeout 900
+          --memory-size 256
