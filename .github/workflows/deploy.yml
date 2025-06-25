@@ -1,52 +1,4 @@
-#name: Deploy to AWS Lambda
-#
-#on:
-#  push:
-#    branches:
-#      - master
-#
-#permissions:
-#  id-token: write
-#  contents: read
-#
-#jobs:
-#  package-and-deploy:
-#    runs-on: ubuntu-latest
-#
-#    steps:
-#      - name: 1. Checkout code
-#        uses: actions/checkout@v4
-#
-#      - name: 2. Setup Python
-#        uses: actions/setup-python@v5
-#        with:
-#          python-version: '3.12'
-#
-#      - name: 3. Setup AWS SAM CLI
-#        uses: aws-actions/setup-sam@v2
-#
-#      - name: 4. Configure AWS credentials
-#        uses: aws-actions/configure-aws-credentials@v4
-#        with:
-#          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-#          aws-region: ${{ secrets.AWS_REGION }}
-#
-#      - name: 5. Run SAM Package
-#        run: >
-#          sam package
-#          --s3-bucket ${{ secrets.AWS_S3_BUCKET_FOR_DEPLOY }}
-#          --output-template-file packaged.yaml
-#
-#      - name: 6. Run SAM Deploy
-#        run: >
-#          sam deploy
-#          --template-file packaged.yaml
-#          --stack-name tesis-extraccion-x-pipeline
-#          --capabilities CAPABILITY_IAM
-#          --region ${{ secrets.AWS_REGION }}
-#          --no-confirm-changeset
-
-name: Deploy Application Code and Configuration
+Deplname: SAM Deploy to AWS
 
 on:
   push:
@@ -58,9 +10,9 @@ permissions:
   contents: read
 
 jobs:
-  build-and-deploy:
+  package-and-deploy:
     runs-on: ubuntu-latest
-
+    
     steps:
       - name: 1. Checkout code
         uses: actions/checkout@v4
@@ -69,45 +21,29 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          
+      - name: 3. Setup AWS SAM CLI
+        uses: aws-actions/setup-sam@v2
 
-      - name: 3. Configure AWS credentials
+      - name: 4. Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: 4. Build deployment package manually
-        run: |
-          set -e
-          echo "--- Installing dependencies from requirements.txt ---"
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt -t ./package
-          echo "--- Dependencies installed ---"
-          echo "--- Copying source code from src/ ---"
-          cp -r src/* ./package/
-          echo "--- Source code copied ---"
-          echo "--- Listing contents of package directory before zipping: ---"
-          ls -la ./package
-          echo "--------------------------------------------------------"
-          echo "--- Zipping deployment package ---"
-          cd package
-          zip -r ../deployment_package.zip .
-          echo "--- Zip complete ---"
-
-      - name: 5. Deploy code to existing Lambda function
+      - name: 5. Run SAM Package
+        # Este paso empaqueta tu código y dependencias y lo sube a S3
         run: >
-          aws lambda update-function-code
-          --function-name extractor-datos-x
-          --zip-file fileb://deployment_package.zip
-          
-      - name: Wait for function update to complete
-        run: sleep 15
+          sam package 
+          --s3-bucket ${{ secrets.AWS_S3_BUCKET_FOR_DEPLOY }} 
+          --output-template-file packaged.yaml
 
-      - name: 6. Update Lambda function configuration
+      - name: 6. Run SAM Deploy
+        # Este paso lee la plantilla empaquetada y crea/actualiza la infraestructura
         run: >
-          aws lambda update-function-configuration
-          --function-name extractor-datos-x
-          --handler funcion_lambda_extraccion_x.lambda_handler
-          --runtime python3.12
-          --timeout 900
-          --memory-size 512
+          sam deploy 
+          --template-file packaged.yaml
+          --stack-name tesis-extraccion-x-pipeline 
+          --capabilities CAPABILITY_IAM 
+          --region ${{ secrets.AWS_REGION }}
+          --no-confirm-changeset
