@@ -1,4 +1,4 @@
-Deplname: SAM Deploy to AWS
+name: SAM Deploy to AWS
 
 on:
   push:
