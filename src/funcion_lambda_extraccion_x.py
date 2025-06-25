@@ -6,14 +6,12 @@ import re
 from datetime import datetime
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
-# --- CONFIGURACIÓN AWS ---
+
 SECRET_NAME = os.environ.get("SECRET_NAME", "tesis/twitter/api_keys")
 REGION_NAME = os.environ.get("AWS_REGION", "us-east-2")
 DATA_TABLE_NAME = "TesisTwitterData"
 STATE_TABLE_NAME = "TesisTwitterState"
-TWEET_BUDGET_MENSUAL = 100
 
-# --- LISTA DE POLITICOS Y MEDIOS A BUSCAR ---
 MEDIOS = [
     "Reforma",
     "El_Universal_Mx",
@@ -22,14 +20,19 @@ MEDIOS = [
     "Pajaropolitico",
     "AristeguiOnline",
     "SinEmbargoMX",
-]  # Aumentamos la lista
+]
 POLITICOS = {
     "Sheinbaum": ["claudia sheinbaum", "@claudiashein"],
     "Galvez": ["xóchitl gálvez", "@xochitlgalvez"],
     "Moreno": ["alito moreno", "alejandro moreno", "@alitomorenoc"],
 }
+LISTA_DE_BUSQUEDAS = [
+    (medio, politico, terminos)
+    for medio in MEDIOS
+    for politico, terminos in POLITICOS.items()
+]
 
-# --- INICIALIZACION DE CLIENTES Y TABLAS ---
+# --- Inicialización de clientes ---
 session = boto3.session.Session()
 secrets_client = session.client(service_name="secretsmanager", region_name=REGION_NAME)
 dynamodb = boto3.resource("dynamodb", region_name=REGION_NAME)
@@ -50,7 +53,9 @@ def get_secret():
         raise e
 
 
-api_client = tweepy.Client(get_secret(), wait_on_rate_limit=True)
+api_client = tweepy.Client(
+    get_secret(), wait_on_rate_limit=False
+)
 
 
 def limpiar_texto(texto):
@@ -61,111 +66,88 @@ def limpiar_texto(texto):
 
 
 def lambda_handler(event, context):
-    # 1. VERIFICAR EL PRESUPUESTO MENSUAL
-    current_month_id = f"count-{datetime.utcnow().strftime('%Y-%m')}"
-    tweets_recolectados_este_mes = 0
+    # ID para guardar puntero/cursor en la tabla de estado
+    CURSOR_ID = "search_cursor"
+
+    # 1. OBTENER LA TAREA ACTUAL
+    cursor_posicion = 0
     try:
-        response = state_table.get_item(Key={"id": current_month_id})
+        response = state_table.get_item(Key={"id": CURSOR_ID})
         if "Item" in response:
-            tweets_recolectados_este_mes = int(response["Item"]["tweets_collected"])
+            cursor_posicion = int(response["Item"]["last_search_index"])
     except Exception:
         pass
 
-    print(
-        f"Presupuesto mensual: {tweets_recolectados_este_mes}/{TWEET_BUDGET_MENSUAL} tuits recolectados este mes."
-    )
-    if tweets_recolectados_este_mes >= TWEET_BUDGET_MENSUAL:
-        print("Cuota mensual alcanzada. Saliendo de la ejecución.")
-        return {"statusCode": 200, "body": "Cuota mensual alcanzada."}
+    # Si el cursor se pasa de la lista, reinicia a 0
+    if cursor_posicion >= len(LISTA_DE_BUSQUEDAS):
+        cursor_posicion = 0
+        print("Se ha completado un ciclo de búsquedas. Reiniciando cursor.")
 
-    presupuesto_restante_en_ejecucion = (
-        TWEET_BUDGET_MENSUAL - tweets_recolectados_este_mes
-    )
-    tweets_guardados_en_esta_ejecucion = 0
+    # Obtenemos la tarea para esta ejecución
+    medio, politico_nombre, terminos_busqueda = LISTA_DE_BUSQUEDAS[cursor_posicion]
 
-    for medio in MEDIOS:
-        for politico_nombre, terminos_busqueda in POLITICOS.items():
-            if presupuesto_restante_en_ejecucion <= 0:
-                break
+    # 2. EJECUTAR BÚSQUEDA (un medio y un político a la vez)
+    search_id = f"search-{medio}_{politico_nombre}"
+    query = f"from:{medio} ({' OR '.join(terminos_busqueda)}) -is:retweet"
+    print(f"Ejecutando tarea #{cursor_posicion}: {query}")
 
-            search_id = f"search-{medio}_{politico_nombre}"
-            query = f"from:{medio} ({' OR '.join(terminos_busqueda)}) -is:retweet"
-            print(f"--- Buscando: {query} ---")
+    last_seen_id = None
+    try:
+        response = state_table.get_item(Key={"id": search_id})
+        if "Item" in response:
+            last_seen_id = response["Item"]["last_seen_tweet_id"]
+    except Exception:
+        pass
 
-            last_seen_id = None
-            try:
-                response = state_table.get_item(Key={"id": search_id})
-                if "Item" in response:
-                    last_seen_id = response["Item"]["last_seen_tweet_id"]
-            except Exception:
-                pass
-
-            try:
-                # máximo 10 tuits o lo que quede del presupuesto
-                tweets_a_pedir = min(10, presupuesto_restante_en_ejecucion)
-                response = api_client.search_recent_tweets(
-                    query=query,
-                    since_id=last_seen_id,
-                    max_results=tweets_a_pedir,
-                    tweet_fields=["created_at", "public_metrics"],
-                )
-
-                if not response.data:
-                    continue
-
-                nuevos_tweets = response.data
-                id_del_tuit_mas_reciente_del_lote = nuevos_tweets[0].id
-
-                for tweet in nuevos_tweets:
-                    texto_limpio = limpiar_texto(tweet.text.lower())
-                    sentiment_score = vader_analyzer.polarity_scores(texto_limpio)[
-                        "compound"
-                    ]
-                    data_table.put_item(
-                        Item={
-                            "tweet_id": str(tweet.id),
-                            "created_at": tweet.created_at.isoformat(),
-                            "autor_medio": medio,
-                            "politico_mencionado": politico_nombre,
-                            "texto": tweet.text,
-                            "retweet_count": tweet.public_metrics["retweet_count"],
-                            "like_count": tweet.public_metrics["like_count"],
-                            "sentiment_score": str(sentiment_score),
-                        }
-                    )
-
-                # 2. ACTUALIZAR ESTADOS
-                # Actualizar el contador mensual
-                tweets_guardados_en_esta_ejecucion += len(nuevos_tweets)
-                state_table.update_item(
-                    Key={"id": current_month_id},
-                    UpdateExpression="ADD tweets_collected :val",
-                    ExpressionAttributeValues={":val": len(nuevos_tweets)},
-                    ReturnValues="UPDATED_NEW",
-                )
-                # Actualizar el last_seen_id para esta búsqueda
-                state_table.put_item(
+    try:
+        response = api_client.search_recent_tweets(
+            query=query,
+            since_id=last_seen_id,
+            max_results=10,
+            tweet_fields=["created_at", "public_metrics"],
+        )
+        if response.data:
+            id_del_tuit_mas_reciente = response.data[0].id
+            for tweet in response.data:
+                texto_limpio = limpiar_texto(tweet.text.lower())
+                sentiment_score = vader_analyzer.polarity_scores(texto_limpio)[
+                    "compound"
+                ]
+                data_table.put_item(
                     Item={
-                        "id": search_id,
-                        "last_seen_tweet_id": str(id_del_tuit_mas_reciente_del_lote),
+                        "tweet_id": str(tweet.id),
+                        "created_at": tweet.created_at.isoformat(),
+                        "autor_medio": medio,
+                        "politico_mencionado": politico_nombre,
+                        "texto": tweet.text,
+                        "retweet_count": tweet.public_metrics["retweet_count"],
+                        "like_count": tweet.public_metrics["like_count"],
+                        "sentiment_score": str(sentiment_score),
                     }
                 )
 
-                presupuesto_restante_en_ejecucion -= len(nuevos_tweets)
-                print(
-                    f"Guardados {len(nuevos_tweets)} tuits. Presupuesto restante en esta ejecución: {presupuesto_restante_en_ejecucion}"
-                )
+            # Actualizar el 'last_seen_id' para cada busqueda
+            state_table.put_item(
+                Item={
+                    "id": search_id,
+                    "last_seen_tweet_id": str(id_del_tuit_mas_reciente),
+                }
+            )
+            print(f"Se encontraron y guardaron {len(response.data)} tuits.")
+        else:
+            print("No se encontraron tuits nuevos para esta búsqueda.")
 
-            except Exception as e:
-                print(f"ERROR durante la búsqueda para {search_id}. Error: {e}")
-                continue
-        if presupuesto_restante_en_ejecucion <= 0:
-            break
+    except Exception as e:
+        print(f"ERROR durante la búsqueda. Error: {e}")
 
-    print(
-        f"Proceso completado. Se guardaron {tweets_guardados_en_esta_ejecucion} tuits en esta ejecución."
+    # 3. ACTUALIZAR EL CURSOR PARA LA PRÓXIMA EJECUCIÓN
+    siguiente_posicion = cursor_posicion + 1
+    state_table.put_item(
+        Item={"id": CURSOR_ID, "last_search_index": siguiente_posicion}
     )
+    print(f"Tarea completada. El próximo turno será la tarea #{siguiente_posicion}.")
+
     return {
         "statusCode": 200,
-        "body": json.dumps(f"Guardados: {tweets_guardados_en_esta_ejecucion} tuits."),
+        "body": json.dumps(f"Tarea #{cursor_posicion} completada."),
     }

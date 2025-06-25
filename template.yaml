@@ -32,10 +32,11 @@ Resources:
       Timeout: 900
       MemorySize: 256
       Events:
-        DailyTrigger:
+        FifteenMinuteTrigger: # Renombramos el trigger
           Type: Schedule
           Properties:
-            Schedule: "cron(0 10 * * ? *)" # Todos los días a las 10 AM UTC
+            # CAMBIO: Ejecutar cada 15 minutos
+            Schedule: "rate(15 minutes)"
             Enabled: true
       Policies:
         - DynamoDBCrudPolicy:
