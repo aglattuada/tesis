@@ -1,31 +1,24 @@
+
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  Pipeline para la recolección continua de datos de X para la tesis.
+  Pipeline de recolección continua y optimizada para la tesis de Arturo Gonzalez Lattuada.
 
 Resources:
   DataTable:
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: TesisTwitterData
-      AttributeDefinitions:
-        - AttributeName: tweet_id
-          AttributeType: S
-      KeySchema:
-        - AttributeName: tweet_id
-          KeyType: HASH
+      AttributeDefinitions: [{AttributeName: tweet_id, AttributeType: S}]
+      KeySchema: [{AttributeName: tweet_id, KeyType: HASH}]
       BillingMode: PAY_PER_REQUEST
 
   StateTable:
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: TesisTwitterState
-      AttributeDefinitions:
-        - AttributeName: search_query_id
-          AttributeType: S
-      KeySchema:
-        - AttributeName: search_query_id
-          KeyType: HASH
+      AttributeDefinitions: [{AttributeName: id, AttributeType: S}] # Una clave genérica
+      KeySchema: [{AttributeName: id, KeyType: HASH}]
       BillingMode: PAY_PER_REQUEST
 
   extractordatosx:
@@ -37,12 +30,12 @@ Resources:
       Runtime: python3.12
       Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/LambdaTesisExtraccionX"
       Timeout: 900
-      MemorySize: 512
+      MemorySize: 256
       Events:
-        HourlyTrigger:
+        DailyTrigger:
           Type: Schedule
           Properties:
-            Schedule: "cron(0 * * * ? *)"
+            Schedule: "cron(0 10 * * ? *)" # Todos los días a las 10 AM UTC
             Enabled: true
       Policies:
         - DynamoDBCrudPolicy:
