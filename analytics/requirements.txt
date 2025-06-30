@@ -1,0 +1,19 @@
+# analysis/requirements.txt
+
+# Para el notebook
+jupyterlab
+
+# Para el análisis y manipulación de datos
+pandas
+numpy
+
+# Para conectarse a AWS y obtener los datos
+boto3
+
+# Para las visualizaciones
+matplotlib
+seaborn
+
+# Para el Topic Modeling
+gensim
+scikit-learn
