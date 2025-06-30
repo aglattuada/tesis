@@ -5,6 +5,12 @@ on:
     branches:
       - master
 
+    paths:
+      - 'src/**'
+      - 'template.yaml'
+      - 'requirements.txt'
+      - '.github/workflows/**'
+
 permissions:
   id-token: write
   contents: read
@@ -29,7 +35,7 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: 4. Build deployment package manually
-        # Este paso nos da control total sobre el empaquetado
+        # Este paso da control total sobre el empaquetado
         run: |
           set -e # El script fallará si cualquier comando falla
           echo "--- Instalando dependencias de requirements.txt ---"
